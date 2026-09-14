@@ -1,30 +1,38 @@
+from datetime import datetime
+
 import plotly.graph_objects as go
-import plotly.express as px
-from plotly.subplots import make_subplots
-import pandas as pd
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional
 
 
-def create_price_chart(price_history: List[Dict], predictions: List[Dict] = None,
-                       product_name: str = "Product", show_annotations: bool = True) -> go.Figure:
+def create_price_chart(
+    price_history: list[dict],
+    predictions: list[dict] = None,
+    product_name: str = "Product",
+    show_annotations: bool = True,
+) -> go.Figure:
     """Create a comprehensive price chart with optional predictions overlay"""
     fig = go.Figure()
 
     # ---- Actual price history ----
     if price_history:
-        dates = [datetime.fromisoformat(h["scraped_at"].replace("Z", "+00:00")) if "T" in str(h["scraped_at"]) else h["scraped_at"] for h in price_history]
+        dates = [
+            datetime.fromisoformat(h["scraped_at"].replace("Z", "+00:00"))
+            if "T" in str(h["scraped_at"])
+            else h["scraped_at"]
+            for h in price_history
+        ]
         prices = [float(h["price"]) for h in price_history]
 
-        fig.add_trace(go.Scatter(
-            x=dates,
-            y=prices,
-            mode="lines+markers",
-            name="Actual Price",
-            line=dict(color="#FF6B6B", width=2),
-            marker=dict(size=5),
-            hovertemplate="₹%{y:,.0f}<extra></extra>"
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=dates,
+                y=prices,
+                mode="lines+markers",
+                name="Actual Price",
+                line=dict(color="#FF6B6B", width=2),
+                marker=dict(size=5),
+                hovertemplate="₹%{y:,.0f}<extra></extra>",
+            )
+        )
 
         if show_annotations and prices:
             # Min price annotation
@@ -42,7 +50,7 @@ def create_price_chart(price_history: List[Dict], predictions: List[Dict] = None
                 bgcolor="rgba(46,204,113,0.15)",
                 bordercolor="#2ECC71",
                 borderwidth=1,
-                borderpad=4
+                borderpad=4,
             )
 
             # Max price annotation
@@ -61,7 +69,7 @@ def create_price_chart(price_history: List[Dict], predictions: List[Dict] = None
                     bgcolor="rgba(255,107,107,0.15)",
                     bordercolor="#FF6B6B",
                     borderwidth=1,
-                    borderpad=4
+                    borderpad=4,
                 )
 
             # Current price annotation
@@ -79,7 +87,7 @@ def create_price_chart(price_history: List[Dict], predictions: List[Dict] = None
                 borderwidth=1,
                 borderpad=4,
                 ax=40,
-                ay=-30
+                ay=-30,
             )
 
     # ---- Prediction trend ----
@@ -89,40 +97,39 @@ def create_price_chart(price_history: List[Dict], predictions: List[Dict] = None
         pred_bands = [p.get("confidence_band", 0) for p in predictions]
 
         # Upper and lower confidence bands
-        upper = [p + b for p, b in zip(pred_prices, pred_bands)]
-        lower = [p - b for p, b in zip(pred_prices, pred_bands)]
+        upper = [p + b for p, b in zip(pred_prices, pred_bands, strict=True)]
+        lower = [p - b for p, b in zip(pred_prices, pred_bands, strict=True)]
 
         # Lower bound fill
-        fig.add_trace(go.Scatter(
-            x=pred_dates,
-            y=lower,
-            mode="lines",
-            line=dict(width=0),
-            showlegend=False,
-            hoverinfo="skip"
-        ))
+        fig.add_trace(
+            go.Scatter(x=pred_dates, y=lower, mode="lines", line=dict(width=0), showlegend=False, hoverinfo="skip")
+        )
 
         # Upper bound fill
-        fig.add_trace(go.Scatter(
-            x=pred_dates,
-            y=upper,
-            mode="lines",
-            line=dict(width=0),
-            fill="tonexty",
-            fillcolor="rgba(52,152,219,0.1)",
-            name="Confidence Band",
-            hoverinfo="skip"
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=pred_dates,
+                y=upper,
+                mode="lines",
+                line=dict(width=0),
+                fill="tonexty",
+                fillcolor="rgba(52,152,219,0.1)",
+                name="Confidence Band",
+                hoverinfo="skip",
+            )
+        )
 
         # Predicted price line
-        fig.add_trace(go.Scatter(
-            x=pred_dates,
-            y=pred_prices,
-            mode="lines",
-            name="Predicted Price",
-            line=dict(color="#3498DB", width=2, dash="dash"),
-            hovertemplate="₹%{y:,.0f}<extra>Predicted</extra>"
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=pred_dates,
+                y=pred_prices,
+                mode="lines",
+                name="Predicted Price",
+                line=dict(color="#3498DB", width=2, dash="dash"),
+                hovertemplate="₹%{y:,.0f}<extra>Predicted</extra>",
+            )
+        )
 
         # Annotate predicted lowest
         if pred_prices:
@@ -139,39 +146,19 @@ def create_price_chart(price_history: List[Dict], predictions: List[Dict] = None
                 bgcolor="rgba(46,204,113,0.8)",
                 bordercolor="#2ECC71",
                 borderwidth=1,
-                borderpad=4
+                borderpad=4,
             )
 
     # ---- Layout ----
     fig.update_layout(
-        title=dict(
-            text=f"Price History: {product_name}",
-            font=dict(size=16, color="#FFFFFF")
-        ),
-        xaxis=dict(
-            title="Date",
-            gridcolor="#2A2D3E",
-            showgrid=True,
-            zeroline=False
-        ),
-        yaxis=dict(
-            title="Price (₹)",
-            gridcolor="#2A2D3E",
-            showgrid=True,
-            zeroline=False,
-            tickformat="₹%{d:,.0f}"
-        ),
+        title=dict(text=f"Price History: {product_name}", font=dict(size=16, color="#FFFFFF")),
+        xaxis=dict(title="Date", gridcolor="#2A2D3E", showgrid=True, zeroline=False),
+        yaxis=dict(title="Price (₹)", gridcolor="#2A2D3E", showgrid=True, zeroline=False, tickformat="₹%{d:,.0f}"),
         plot_bgcolor="#1E2130",
         paper_bgcolor="#0E1117",
         font=dict(color="#AAAAAA"),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        ),
-        margin=dict(l=60, r=20, t=40, b=40)
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        margin=dict(l=60, r=20, t=40, b=40),
     )
 
     fig.update_xaxes(gridwidth=1, gridcolor="#2A2D3E")
@@ -182,35 +169,30 @@ def create_price_chart(price_history: List[Dict], predictions: List[Dict] = None
 
 def create_savings_gauge(savings_percent: float) -> go.Figure:
     """Create a gauge chart showing savings percentage"""
-    fig = go.Figure(go.Indicator(
-        mode="gauge+number+delta",
-        value=savings_percent,
-        number={"suffix": "%", "font": {"size": 28, "color": "#FFFFFF"}},
-        gauge={
-            "axis": {"range": [0, 50], "tickwidth": 1, "tickcolor": "#2A2D3E"},
-            "bar": {"color": "#FF6B6B"},
-            "bgcolor": "#1E2130",
-            "borderwidth": 2,
-            "bordercolor": "#2A2D3E",
-            "steps": [
-                {"range": [0, 5], "color": "#2ECC71"},
-                {"range": [5, 15], "color": "#F39C12"},
-                {"range": [15, 50], "color": "#E74C3C"}
-            ],
-            "threshold": {
-                "line": {"color": "#FFFFFF", "width": 3},
-                "thickness": 0.75,
-                "value": savings_percent
-            }
-        },
-        title={"text": "Potential Savings", "font": {"size": 16, "color": "#AAAAAA"}}
-    ))
+    fig = go.Figure(
+        go.Indicator(
+            mode="gauge+number+delta",
+            value=savings_percent,
+            number={"suffix": "%", "font": {"size": 28, "color": "#FFFFFF"}},
+            gauge={
+                "axis": {"range": [0, 50], "tickwidth": 1, "tickcolor": "#2A2D3E"},
+                "bar": {"color": "#FF6B6B"},
+                "bgcolor": "#1E2130",
+                "borderwidth": 2,
+                "bordercolor": "#2A2D3E",
+                "steps": [
+                    {"range": [0, 5], "color": "#2ECC71"},
+                    {"range": [5, 15], "color": "#F39C12"},
+                    {"range": [15, 50], "color": "#E74C3C"},
+                ],
+                "threshold": {"line": {"color": "#FFFFFF", "width": 3}, "thickness": 0.75, "value": savings_percent},
+            },
+            title={"text": "Potential Savings", "font": {"size": 16, "color": "#AAAAAA"}},
+        )
+    )
 
     fig.update_layout(
-        paper_bgcolor="#0E1117",
-        font=dict(color="#FFFFFF"),
-        height=250,
-        margin=dict(l=30, r=30, t=60, b=30)
+        paper_bgcolor="#0E1117", font=dict(color="#FFFFFF"), height=250, margin=dict(l=30, r=30, t=60, b=30)
     )
     return fig
 
@@ -249,7 +231,7 @@ def create_recommendation_card(recommendation: str, confidence: float) -> str:
     return html
 
 
-def create_product_card(product_data: Dict, analysis: Dict = None) -> str:
+def create_product_card(product_data: dict, analysis: dict = None) -> str:
     """Create a styled HTML product card"""
     name = product_data.get("name", "Unknown Product")
     url = product_data.get("url", "#")
@@ -336,7 +318,7 @@ def create_product_card(product_data: Dict, analysis: Dict = None) -> str:
     return html
 
 
-def create_savings_summary_chart(user_stats: Dict) -> Optional[go.Figure]:
+def create_savings_summary_chart(user_stats: dict) -> go.Figure | None:
     """Create a summary chart of buy/wait recommendations across tracked products"""
     buy = user_stats.get("buy_now_count", 0)
     wait = user_stats.get("wait_count", 0)
@@ -349,24 +331,25 @@ def create_savings_summary_chart(user_stats: Dict) -> Optional[go.Figure]:
     values = [buy, wait]
     colors = ["#2ECC71", "#F39C12"]
 
-    fig = go.Figure(data=[go.Pie(
-        labels=labels,
-        values=values,
-        marker=dict(colors=colors),
-        hole=0.55,
-        textinfo="label+percent",
-        textfont=dict(color="#FFFFFF", size=13),
-        hovertemplate="%{label}: %{value} products<extra></extra>"
-    )])
+    fig = go.Figure(
+        data=[
+            go.Pie(
+                labels=labels,
+                values=values,
+                marker=dict(colors=colors),
+                hole=0.55,
+                textinfo="label+percent",
+                textfont=dict(color="#FFFFFF", size=13),
+                hovertemplate="%{label}: %{value} products<extra></extra>",
+            )
+        ]
+    )
 
     fig.update_layout(
-        title=dict(
-            text=f"Your {total} Tracked Products",
-            font=dict(size=16, color="#FFFFFF")
-        ),
+        title=dict(text=f"Your {total} Tracked Products", font=dict(size=16, color="#FFFFFF")),
         paper_bgcolor="#0E1117",
         font=dict(color="#AAAAAA"),
         height=300,
-        margin=dict(l=20, r=20, t=40, b=20)
+        margin=dict(l=20, r=20, t=40, b=20),
     )
     return fig

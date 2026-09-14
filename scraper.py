@@ -1,10 +1,11 @@
-import re
-import requests
 import random
+import re
 import time
-from typing import Optional, Dict, List, Tuple
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse
+
+import requests
 from bs4 import BeautifulSoup
+
 from config import SCRAPERAPI_KEY
 
 # User agents to rotate
@@ -25,7 +26,7 @@ DEFAULT_HEADERS = {
 }
 
 
-def get_random_headers() -> Dict:
+def get_random_headers() -> dict:
     """Get random user agent headers"""
     headers = DEFAULT_HEADERS.copy()
     headers["User-Agent"] = random.choice(USER_AGENTS)
@@ -47,32 +48,33 @@ def detect_source(url: str) -> str:
         return "unknown"
 
 
-def extract_product_id(url: str) -> Optional[str]:
+def extract_product_id(url: str) -> str | None:
     """Extract product ID from URL based on source"""
     source = detect_source(url)
-    parsed = urlparse(url)
 
     if source == "amazon":
-        match = re.search(r'/dp/([A-Z0-9]{10})', url)
+        match = re.search(r"/dp/([A-Z0-9]{10})", url)
         if match:
             return match.group(1)
-        match = re.search(r'/gp/product/([A-Z0-9]{10})', url)
+        match = re.search(r"/gp/product/([A-Z0-9]{10})", url)
         if match:
             return match.group(1)
     elif source == "flipkart":
-        match = re.search(r'/p/([a-zA-Z0-9]+)', url)
+        match = re.search(r"/p/([a-zA-Z0-9]+)", url)
         if match:
             return match.group(1)
 
     return None
 
 
-def fetch_with_scraperapi(url: str) -> Optional[requests.Response]:
+def fetch_with_scraperapi(url: str) -> requests.Response | None:
     """Fetch URL using ScraperAPI as proxy"""
     if not SCRAPERAPI_KEY:
         return None
     try:
-        api_url = f"https://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={requests.utils.quote(url, safe='')}&render=true"
+        api_url = (
+            f"https://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={requests.utils.quote(url, safe='')}&render=true"
+        )
         response = requests.get(api_url, timeout=30)
         if response.status_code == 200:
             return response
@@ -81,17 +83,19 @@ def fetch_with_scraperapi(url: str) -> Optional[requests.Response]:
     return None
 
 
-def fetch_page(url: str) -> Optional[requests.Response]:
+def fetch_page(url: str) -> requests.Response | None:
     """Fetch a webpage with retry logic"""
     # First try direct request
-    for attempt in range(2):
+    for _attempt in range(2):
         try:
             headers = get_random_headers()
             response = requests.get(url, headers=headers, timeout=20)
-            if response.status_code == 200:
-                # Check if we got a captcha page
-                if "captcha" not in response.url.lower() and "sorry" not in response.url.lower():
-                    return response
+            if (
+                response.status_code == 200
+                and "captcha" not in response.url.lower()
+                and "sorry" not in response.url.lower()
+            ):
+                return response
         except Exception:
             pass
         time.sleep(random.uniform(1, 3))
@@ -100,17 +104,24 @@ def fetch_page(url: str) -> Optional[requests.Response]:
     return fetch_with_scraperapi(url)
 
 
-def parse_price(text: str) -> Optional[float]:
+def parse_price(text: str) -> float | None:
     """Extract price from HTML text, handling various formats"""
     if not text:
         return None
 
     # Remove currency symbols and commas
-    cleaned = text.replace("₹", "").replace("Rs.", "").replace("₹", "") \
-        .replace(",", "").replace("INR", "").replace(" ", "").strip()
+    cleaned = (
+        text.replace("₹", "")
+        .replace("Rs.", "")
+        .replace("₹", "")
+        .replace(",", "")
+        .replace("INR", "")
+        .replace(" ", "")
+        .strip()
+    )
 
     # Match patterns like 74999, 72,999.00, 74999.99
-    match = re.search(r'(\d+(?:\.\d{1,2})?)', cleaned)
+    match = re.search(r"(\d+(?:\.\d{1,2})?)", cleaned)
     if match:
         try:
             return float(match.group(1))
@@ -119,7 +130,7 @@ def parse_price(text: str) -> Optional[float]:
     return None
 
 
-def scrape_amazon(url: str) -> Dict:
+def scrape_amazon(url: str) -> dict:
     """Scrape product info from Amazon India"""
     result = {"name": None, "price": None, "image_url": None, "success": False, "error": None}
     response = fetch_page(url)
@@ -138,12 +149,12 @@ def scrape_amazon(url: str) -> Dict:
     # Price - try multiple selectors
     price = None
     price_selectors = [
-        'span.a-price-whole',
-        'span.a-price > span.a-offscreen',
-        'span#priceblock_ourprice',
-        'span#priceblock_dealprice',
-        'span.a-price.a-text-price > span.a-offscreen',
-        'span.a-price.a-text-price.a-text-secondary > span.a-offscreen',
+        "span.a-price-whole",
+        "span.a-price > span.a-offscreen",
+        "span#priceblock_ourprice",
+        "span#priceblock_dealprice",
+        "span.a-price.a-text-price > span.a-offscreen",
+        "span.a-price.a-text-price.a-text-secondary > span.a-offscreen",
     ]
     for selector in price_selectors:
         elem = soup.select_one(selector)
@@ -154,9 +165,9 @@ def scrape_amazon(url: str) -> Dict:
 
     if not price:
         # Try meta og:price
-        meta = soup.find('meta', {'property': 'og:price:amount'})
-        if meta and meta.get('content'):
-            price = parse_price(meta['content'])
+        meta = soup.find("meta", {"property": "og:price:amount"})
+        if meta and meta.get("content"):
+            price = parse_price(meta["content"])
 
     result["price"] = price
 
@@ -165,7 +176,7 @@ def scrape_amazon(url: str) -> Dict:
     if img_elem:
         result["image_url"] = img_elem.get("data-old-hires") or img_elem.get("src")
     else:
-        img_elem = soup.find('meta', {'property': 'og:image'})
+        img_elem = soup.find("meta", {"property": "og:image"})
         if img_elem:
             result["image_url"] = img_elem.get("content")
 
@@ -176,7 +187,7 @@ def scrape_amazon(url: str) -> Dict:
     return result
 
 
-def scrape_flipkart(url: str) -> Dict:
+def scrape_flipkart(url: str) -> dict:
     """Scrape product info from Flipkart"""
     result = {"name": None, "price": None, "image_url": None, "success": False, "error": None}
     response = fetch_page(url)
@@ -213,7 +224,7 @@ def scrape_flipkart(url: str) -> Dict:
                     break
 
     # Image
-    img_elem = soup.find('meta', {'property': 'og:image'})
+    img_elem = soup.find("meta", {"property": "og:image"})
     if img_elem:
         result["image_url"] = img_elem.get("content")
 
@@ -224,7 +235,7 @@ def scrape_flipkart(url: str) -> Dict:
     return result
 
 
-def scrape_product(url: str) -> Dict:
+def scrape_product(url: str) -> dict:
     """Main entry point - scrape any supported product URL"""
     source = detect_source(url)
 
@@ -238,7 +249,7 @@ def scrape_product(url: str) -> Dict:
             "price": None,
             "image_url": None,
             "success": False,
-            "error": f"Unsupported website. Only Amazon.in and Flipkart are supported."
+            "error": "Unsupported website. Only Amazon.in and Flipkart are supported.",
         }
 
     result["source"] = source
@@ -252,7 +263,7 @@ def scrape_product(url: str) -> Dict:
     return result
 
 
-def generate_search_urls(product_url: str) -> List[str]:
+def generate_search_urls(product_url: str) -> list[str]:
     """Generate alternative URLs to try for a product"""
     source = detect_source(product_url)
     product_id = extract_product_id(product_url)
@@ -266,7 +277,7 @@ def generate_search_urls(product_url: str) -> List[str]:
     return urls if urls else [product_url]
 
 
-def check_price_drop(current_price: float, previous_price: float) -> Tuple[bool, float]:
+def check_price_drop(current_price: float, previous_price: float) -> tuple[bool, float]:
     """Check if price has dropped significantly"""
     if not previous_price or not current_price:
         return False, 0.0

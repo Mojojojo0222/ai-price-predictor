@@ -1,0 +1,151 @@
+# ============================================================================
+# CI Pipeline — Lint · Unit Test · Security · Streamlit Smoke Test
+# Every push to `main` and every Pull Request runs the full quality gate.
+#
+# Jobs (parallel):
+#   1. lint          → ruff (style, imports, errors)      [fastest feedback]
+#   2. test          → pytest across Python 3.11 & 3.12   (dependency cache)
+#   3. streamlit     → official AppTest smoke test: boots the app headless
+#                      and asserts every page renders without exceptions
+#   4. security      → pip-audit (known-vulnerable deps) + gitleaks (secrets)
+# ============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:          # allow manual runs from the Actions tab
+
+# Least-privilege token: read repo contents only.
+permissions:
+  contents: read
+
+# Cancel stale runs on the same branch to save CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # -------------------------------------------------------------------------
+  # LINT — ruff (lint + format check)
+  # -------------------------------------------------------------------------
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dev dependencies
+        run: pip install ruff
+
+      - name: Run ruff lint
+        run: ruff check .
+
+      - name: Check formatting
+        run: ruff format --check .
+
+  # -------------------------------------------------------------------------
+  # TEST — pytest on a Python version matrix
+  # -------------------------------------------------------------------------
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      # .env is gitignored; provide placeholder values so imports succeed.
+      - name: Create placeholder .env
+        run: |
+          cp .env.example .env
+          echo "APP_URL=http://localhost:8501" >> .env
+
+      - name: Run pytest
+        run: python -m pytest
+
+  # -------------------------------------------------------------------------
+  # STREAMLIT — official AppTest smoke test
+  # Boots app.py headless and fails if any page throws an exception.
+  # -------------------------------------------------------------------------
+  streamlit:
+    name: Streamlit smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Create placeholder .env
+        run: |
+          cp .env.example .env
+          echo "APP_URL=http://localhost:8501" >> .env
+
+      - name: Run Streamlit AppTest smoke test
+        uses: streamlit/streamlit-app-action@v0.0.3
+        with:
+          app-path: app.py
+
+  # -------------------------------------------------------------------------
+  # SECURITY — dependency audit + secret scan
+  # -------------------------------------------------------------------------
+  security:
+    name: Security audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # scan full history for leaked secrets
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      # pip-audit: fail if any installed dependency has a known CVE.
+      - name: Audit dependencies (pip-audit)
+        run: |
+          pip install --upgrade pip
+          pip install pip-audit
+          pip-audit -r requirements.txt --desc on
+
+      # gitleaks: fail the build if a secret was accidentally committed.
+      - name: Scan for secrets (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

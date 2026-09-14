@@ -1,15 +1,13 @@
-import numpy as np
-import pandas as pd
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+
+import pandas as pd
 
 # scikit-learn imports
-from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.model_selection import train_test_split
 
-from config import PREDICTION_DAYS_AHEAD, MIN_DATA_POINTS_FOR_PREDICTION
+from config import MIN_DATA_POINTS_FOR_PREDICTION, PREDICTION_DAYS_AHEAD
 
 
 class PricePredictionEngine:
@@ -33,12 +31,12 @@ class PricePredictionEngine:
 
         # Festival/holiday season flags (Indian context)
         features["festive_season"] = features["month"].isin([10, 11]).astype(int)  # Diwali season
-        features["new_year_sale"] = features["month"].isin([1, 2]).astype(int)     # January sales
-        features["great_sale"] = features["month"].isin([7, 8]).astype(int)        # July/August sales
+        features["new_year_sale"] = features["month"].isin([1, 2]).astype(int)  # January sales
+        features["great_sale"] = features["month"].isin([7, 8]).astype(int)  # July/August sales
 
         return features
 
-    def _prepare_data(self, price_history: List[Dict]) -> Optional[pd.DataFrame]:
+    def _prepare_data(self, price_history: list[dict]) -> pd.DataFrame | None:
         """Convert price history to training data"""
         if not price_history or len(price_history) < MIN_DATA_POINTS_FOR_PREDICTION:
             return None
@@ -54,43 +52,36 @@ class PricePredictionEngine:
         data = data.sort_values("scraped_at").drop_duplicates(subset=["scraped_at"])
         return data
 
-    def train(self, price_history: List[Dict]) -> bool:
+    def train(self, price_history: list[dict]) -> bool:
         """Train the prediction model on price history"""
         data = self._prepare_data(price_history)
         if data is None:
             return False
 
         features = self._extract_features(data["scraped_at"])
-        X = features.values
+        x = features.values
         y = data["price"].values
 
         # Use RandomForest for better accuracy with small datasets
-        self.model = RandomForestRegressor(
-            n_estimators=100,
-            max_depth=5,
-            min_samples_leaf=2,
-            random_state=42
-        )
+        self.model = RandomForestRegressor(n_estimators=100, max_depth=5, min_samples_leaf=2, random_state=42)
 
         if len(data) >= 10:
             try:
-                X_train, X_test, y_train, y_test = train_test_split(
-                    X, y, test_size=0.2, random_state=42, shuffle=False
-                )
-                self.model.fit(X_train, y_train)
-                y_pred = self.model.predict(X_test)
+                x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42, shuffle=False)
+                self.model.fit(x_train, y_train)
+                y_pred = self.model.predict(x_test)
                 self.mae = mean_absolute_error(y_test, y_pred)
                 self.r2 = r2_score(y_test, y_pred)
             except Exception:
                 # Not enough data for split, train on all
-                self.model.fit(X, y)
+                self.model.fit(x, y)
         else:
-            self.model.fit(X, y)
+            self.model.fit(x, y)
 
         self._trained = True
         return True
 
-    def predict_price(self, target_date: datetime) -> Tuple[Optional[float], Optional[float]]:
+    def predict_price(self, target_date: datetime) -> tuple[float | None, float | None]:
         """Predict price for a target date. Returns (predicted_price, confidence_band)"""
         if not self._trained or self.model is None:
             return None, None
@@ -98,15 +89,15 @@ class PricePredictionEngine:
         date_df = pd.DataFrame({"date": [target_date]})
         date_df["date"] = pd.to_datetime(date_df["date"])
         features = self._extract_features(date_df["date"])
-        X = features.values
+        x = features.values
 
-        prediction = self.model.predict(X)[0]
+        prediction = self.model.predict(x)[0]
 
         # Confidence band based on MAE
         band = max(self.mae * 1.5, prediction * 0.03)  # At least 3% band
         return float(prediction), float(band)
 
-    def predict_trend(self, price_history: List[Dict], days_ahead: int = None) -> List[Dict]:
+    def predict_trend(self, price_history: list[dict], days_ahead: int = None) -> list[dict]:
         """Predict prices for the next N days"""
         if days_ahead is None:
             days_ahead = PREDICTION_DAYS_AHEAD
@@ -124,15 +115,11 @@ class PricePredictionEngine:
             target_date = last_date + timedelta(days=i)
             price, band = self.predict_price(target_date)
             if price:
-                predictions.append({
-                    "date": target_date,
-                    "predicted_price": price,
-                    "confidence_band": band
-                })
+                predictions.append({"date": target_date, "predicted_price": price, "confidence_band": band})
 
         return predictions
 
-    def predict_lowest(self, price_history: List[Dict], days_ahead: int = None) -> Dict:
+    def predict_lowest(self, price_history: list[dict], days_ahead: int = None) -> dict:
         """Find the predicted lowest price in the next N days"""
         if days_ahead is None:
             days_ahead = PREDICTION_DAYS_AHEAD
@@ -146,15 +133,17 @@ class PricePredictionEngine:
             "predicted_low": lowest["predicted_price"],
             "predicted_low_date": lowest["date"],
             "confidence_band": lowest["confidence_band"],
-            "trend": trends
+            "trend": trends,
         }
 
 
-def determine_recommendation(current_price: float,
-                             predicted_low: float,
-                             predicted_low_date: datetime,
-                             confidence: float,
-                             historical_low: float = None) -> Tuple[str, str]:
+def determine_recommendation(
+    current_price: float,
+    predicted_low: float,
+    predicted_low_date: datetime,
+    confidence: float,
+    historical_low: float = None,
+) -> tuple[str, str]:
     """Determine buy/wait recommendation with reasoning"""
     if current_price is None or predicted_low is None:
         return "NO_DATA", "Not enough data to make a prediction yet."
@@ -193,13 +182,12 @@ def determine_recommendation(current_price: float,
         return "BUY_NOW", reasoning
     else:
         reasoning = (
-            f"Predicted low of ₹{predicted_low:,.0f} is {days_until_low} days away. "
-            f"Consider waiting if you can."
+            f"Predicted low of ₹{predicted_low:,.0f} is {days_until_low} days away. Consider waiting if you can."
         )
         return "WAIT", reasoning
 
 
-def analyze_product(price_history: List[Dict], product_name: str = None) -> Dict:
+def analyze_product(price_history: list[dict], product_name: str = None) -> dict:
     """Full analysis pipeline: train, predict, recommend"""
     engine = PricePredictionEngine()
 
@@ -208,7 +196,7 @@ def analyze_product(price_history: List[Dict], product_name: str = None) -> Dict
             "status": "NO_DATA",
             "message": "Not enough price data yet. Try again after a few days of tracking.",
             "current_price": price_history[-1]["price"] if price_history else None,
-            "trained": False
+            "trained": False,
         }
 
     current_price = price_history[-1]["price"]
@@ -225,7 +213,7 @@ def analyze_product(price_history: List[Dict], product_name: str = None) -> Dict
         predicted_low=prediction["predicted_low"],
         predicted_low_date=prediction["predicted_low_date"],
         confidence=confidence,
-        historical_low=min([p["price"] for p in price_history]) if price_history else None
+        historical_low=min([p["price"] for p in price_history]) if price_history else None,
     )
 
     recommendation, reasoning = optimal_payload
@@ -240,15 +228,12 @@ def analyze_product(price_history: List[Dict], product_name: str = None) -> Dict
         "recommendation": recommendation,
         "reasoning": reasoning,
         "trend": prediction["trend"],
-        "model_metrics": {
-            "mae": engine.mae,
-            "r2": engine.r2
-        },
-        "product_name": product_name
+        "model_metrics": {"mae": engine.mae, "r2": engine.r2},
+        "product_name": product_name,
     }
 
 
-def get_savings_estimate(analysis: Dict) -> Dict:
+def get_savings_estimate(analysis: dict) -> dict:
     """Calculate potential savings from the analysis"""
     if analysis.get("status") != "ANALYZED":
         return {"savings": 0, "savings_percent": 0, "message": "No data"}
@@ -261,5 +246,5 @@ def get_savings_estimate(analysis: Dict) -> Dict:
     return {
         "savings": savings,
         "savings_percent": savings_percent,
-        "message": f"Potential savings: ₹{savings:,.0f} ({savings_percent:.1f}%)"
+        "message": f"Potential savings: ₹{savings:,.0f} ({savings_percent:.1f}%)",
     }

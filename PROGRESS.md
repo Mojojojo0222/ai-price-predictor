@@ -1,7 +1,7 @@
 # AI Price Predictor - Progress Tracker
 
-## Current Status: BUILDING (resumed)
-## Last Updated: Sep 14, 2026 (2nd session)
+## Current Status: BUILDING (resumed - CI/CD added)
+## Last Updated: Sep 14, 2026 (3rd session - DevOps)
 
 ---
 
@@ -95,14 +95,29 @@
 - [x] app.py compiles OK
 - [x] Streamlit launches and serves HTTP 200 + health check "ok"
 
-### Phase 12: DEPLOYMENT PREP ✅ COMPLETE
-- [x] Create .env (placeholders) and .env.example (with instructions)
-- [x] Create supabase_schema.sql (full DB schema + RLS policies)
-- [x] Create .gitignore (excludes secrets)
-- [ ] Create GitHub repo + push code
-- [ ] Create Supabase project + run schema
-- [ ] Deploy to Streamlit Cloud + set environment variables
-- [ ] Test end-to-end flow
+### Phase 13: CI/CD PIPELINE ✅ COMPLETE
+- [x] Create tests/ suite (predictor, scraper, alerts, config) — 47 tests
+- [x] Create pyproject.toml (ruff + pytest config)
+- [x] Create Makefile (mirrors CI)
+- [x] Create .github/workflows/ci.yml:
+  - lint (ruff), test (pytest matrix 3.11/3.12)
+  - streamlit smoke test (official streamlit-app-action)
+  - security (pip-audit + gitleaks)
+  - least-privilege permissions, concurrency control, pip caching
+- [x] Create .github/workflows/deploy.yml (post-deploy health check / SRE)
+- [x] Add CI/CD badges + section to README
+- [x] Fix ALL ruff lint issues (170 → 0)
+- [x] Fix ALL failing tests (4 → 47 passing)
+- [x] Bump deps to patched versions (pip-audit: 51 vulns → 0):
+  - streamlit 1.31→1.54, dotenv 1.0.0→1.2.2, requests 2.31→2.33, sklearn 1.4.2→1.5.0
+- [x] Verify app boots with Streamlit 1.54 (health "ok")
+- [ ] PUSH to GitHub ← NEXT
+
+### Phase 14: LIVE DEPLOYMENT ⏳ PENDING (USER ACCOUNTS NEEDED)
+- [ ] Create Supabase project + run supabase_schema.sql (user)
+- [ ] Deploy on Streamlit Community Cloud (user)
+- [ ] Set repo Variables/Secrets: APP_URL, SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY
+- [ ] Test end-to-end on live URL
 
 ---
 

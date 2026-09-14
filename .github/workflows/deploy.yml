@@ -1,0 +1,97 @@
+# ============================================================================
+# CD Pipeline — Deploy & Verify on Streamlit Community Cloud
+#
+# Streamlit Community Cloud auto-deploys on every push to the connected branch
+# ("your GitHub repository is the source for your app; any time you push an
+# update you'll see it reflected in the app in almost real time").
+#
+# This workflow therefore implements the SRE side of CD:
+#   1. Ring-fence secrets → the deployed runtime reads them from GitHub Secrets
+#      (Community Cloud can consume the same values via .streamlit/secrets.toml
+#       that the developer pastes in the dashboard).
+#   2. Post-deploy verification → after Streamlit finishes its rollout, poll
+#      the live app's health endpoint until it reports healthy (up to N retries).
+#
+# GATING: the workflow *silently skips* (rather than failing) until the
+# variable APP_URL is configured for this repository (Settings → Variables).
+# ============================================================================
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app.py"
+      - "auth.py"
+      - "database.py"
+      - "scraper.py"
+      - "predictor.py"
+      - "alerts.py"
+      - "charts.py"
+      - "scheduler.py"
+      - "config.py"
+      - "requirements.txt"
+      - ".streamlit/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:          # manual redeploy/verify from the Actions tab
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false   # never cancel an in-flight deployment
+
+jobs:
+  verify-deployment:
+    name: Post-deploy health check
+    runs-on: ubuntu-latest
+    # Skip gracefully until APP_URL is configured (avoids noisy failures).
+    if: ${{ vars.APP_URL != '' }}
+    steps:
+      - name: Validate required variables
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: |
+          missing=()
+          [ -n "$APP_URL" ]      || missing+=("APP_URL")
+          [ -n "$SUPABASE_URL" ] || missing+=("SUPABASE_URL")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing required variables: ${missing[*]}"
+            exit 1
+          fi
+          echo "APP_URL=${APP_URL}" >> "$GITHUB_ENV"
+
+      - name: Wait for Streamlit rollout to complete
+        run: |
+          # Community Cloud takes a minute or two to reflect a push.
+          echo "Waiting 90s for Streamlit Community Cloud to start rollout..."
+          sleep 90
+
+      - name: Poll health endpoint
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          # SRE-style uptime probe: retry until healthz returns 200 "ok".
+          end=$((SECONDS + 300))          # 5-minute window
+          attempts=0
+          while [ $SECONDS -lt $end ]; do
+            attempts=$((attempts + 1))
+            status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "${APP_URL}/healthz" || true)
+            if [ "$status" = "200" ]; then
+              echo "✅ Health probe passed on attempt ${attempts}: ${APP_URL}/healthz -> HTTP 200"
+              exit 0
+            fi
+            echo "Attempt ${attempts}: got HTTP ${status}, retrying in 15s..."
+            sleep 15
+          done
+          echo "::error::App did not become healthy within 5 minutes."
+          exit 1
+
+      - name: Report deployment
+        run: |
+          echo "## ✅ Live" >> "$GITHUB_STEP_SUMMARY"
+          echo "Deployed revision \`${GITHUB_SHA:0:7}\` of \`main\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "→ ${{ vars.APP_URL }}" >> "$GITHUB_STEP_SUMMARY"

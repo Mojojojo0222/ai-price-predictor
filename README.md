@@ -10,6 +10,8 @@ Track any Amazon/Flipkart product. Our ML engine predicts future price dips and 
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.31-red.svg?logo=streamlit&logoColor=white)](https://streamlit.io/)
 [![Supabase](https://img.shields.io/badge/Supabase-PostgresQL-green.svg?logo=supabase&logoColor=white)](https://supabase.com/)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-RandomForest-orange.svg?logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
+[![CI](https://github.com/Mojojojo0222/ai-price-predictor/actions/workflows/ci.yml/badge.svg)](https://github.com/Mojojojo0222/ai-price-predictor/actions/workflows/ci.yml)
+[![Deploy](https://github.com/Mojojojo0222/ai-price-predictor/actions/workflows/deploy.yml/badge.svg)](https://github.com/Mojojojo0222/ai-price-predictor/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
@@ -206,8 +208,16 @@ ai-price-predictor/
 ├── charts.py               # Plotly visualizations + styled HTML components
 ├── config.py               # Centralised environment configuration
 ├── supabase_schema.sql     # Complete DB schema + RLS policies (1-click setup)
+├── Makefile                # Developer commands (mirrors CI exactly)
+├── pyproject.toml          # ruff & pytest configuration
 ├── requirements.txt        # Pinned, tested dependency versions
+├── requirements-dev.txt    # Dev/CI deps (pytest, ruff, pip-audit)
 ├── .env.example            # Credentials template with setup instructions
+├── tests/                  # pytest suite (predictor, scraper, alerts, config)
+├── .github/
+│   └── workflows/
+│       ├── ci.yml          # Lint + unit tests + smoke test + security audit
+│       └── deploy.yml      # Auto-deploy trigger + post-deploy health check
 └── .streamlit/
     └── config.toml         # Streamlit server + dark theme
 ```
@@ -287,6 +297,23 @@ APP_URL = "https://your-app.streamlit.app"
 ```
 
 Deployment is automatic on every `git push` to `main`. ✨
+
+---
+
+## 🔄 CI/CD Pipeline
+
+Four parallel quality gates run on **every push and Pull Request** via [GitHub Actions](.github/workflows/):
+
+| Job | Tool | Gate |
+|-----|------|------|
+| `lint` | ruff | Style, import ordering & error rules |
+| `test` | pytest | Unit tests on **Python 3.11 & 3.12** matrix |
+| `streamlit` | Streamlit AppTest | Boots the app headless — fails if any page throws |
+| `security` | pip-audit + gitleaks | Blocks **known-CVE dependencies** and **leaked secrets** |
+
+**CD + SRE:** Community Cloud auto-deploys every push to `main`; the `deploy` workflow then **polls the live `/healthz` endpoint** until the rollout is verified healthy.
+
+> 🔧 Great for interview talking-points: least-privilege `permissions:`, pinned action versions, `concurrency` guards that cancel stale runs, pip dependency caching, and a matrix test-strategy — all visible in [`.github/workflows/`](.github/workflows/).
 
 ---
 

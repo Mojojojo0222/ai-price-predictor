@@ -1,0 +1,5 @@
+# Development & CI dependencies
+-r requirements.txt
+pytest==8.1.1
+ruff==0.3.3
+pip-audit==2.7.0

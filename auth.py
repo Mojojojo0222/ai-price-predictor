@@ -1,10 +1,12 @@
+import contextlib
+
 import streamlit as st
-from supabase import create_client, Client
-from config import SUPABASE_URL, SUPABASE_KEY
-from typing import Optional, Dict
+from supabase import Client, create_client
+
+from config import SUPABASE_KEY, SUPABASE_URL
 
 # Lazy Supabase client initialization (so app works before real credentials)
-_auth_client: Optional[Client] = None
+_auth_client: Client | None = None
 
 
 def get_auth_client() -> Client:
@@ -29,14 +31,14 @@ def init_session_state():
         st.session_state.refresh_token = None
 
 
-def get_current_user() -> Optional[Dict]:
+def get_current_user() -> dict | None:
     """Get the current logged-in user"""
     if st.session_state.get("is_authenticated"):
         return st.session_state.get("user")
     return None
 
 
-def sign_up_with_email(email: str, password: str, name: str = None) -> Dict:
+def sign_up_with_email(email: str, password: str, name: str = None) -> dict:
     """Sign up a new user with email/password"""
     try:
         user_data = {"email": email, "password": password}
@@ -49,12 +51,10 @@ def sign_up_with_email(email: str, password: str, name: str = None) -> Dict:
         return {"success": False, "error": str(e)}
 
 
-def sign_in_with_email(email: str, password: str) -> Dict:
+def sign_in_with_email(email: str, password: str) -> dict:
     """Sign in existing user with email/password"""
     try:
-        result = get_auth_client().auth.sign_in_with_password(
-            {"email": email, "password": password}
-        )
+        result = get_auth_client().auth.sign_in_with_password({"email": email, "password": password})
         if result.session:
             st.session_state.access_token = result.session.access_token
             st.session_state.refresh_token = result.session.refresh_token
@@ -67,12 +67,9 @@ def sign_in_with_google():
     """Get Google OAuth URL for login"""
     try:
         # This returns a URL the user must visit to authenticate
-        result = get_auth_client().auth.sign_in_with_oauth({
-            "provider": "google",
-            "options": {
-                "redirect_to": "https://your-app.streamlit.app"
-            }
-        })
+        result = get_auth_client().auth.sign_in_with_oauth(
+            {"provider": "google", "options": {"redirect_to": "https://your-app.streamlit.app"}}
+        )
         return {"success": True, "url": result.url}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -83,9 +80,7 @@ def handle_oauth_callback():
     query_params = st.query_params
     if "code" in query_params:
         try:
-            result = get_auth_client().auth.exchange_code_for_session(
-                query_params.get("code")
-            )
+            result = get_auth_client().auth.exchange_code_for_session(query_params.get("code"))
             if result.session:
                 st.session_state.access_token = result.session.access_token
                 st.session_state.refresh_token = result.session.refresh_token
@@ -100,10 +95,8 @@ def handle_oauth_callback():
 
 def sign_out():
     """Sign out the current user"""
-    try:
+    with contextlib.suppress(Exception):
         get_auth_client().auth.sign_out()
-    except Exception:
-        pass
     st.session_state.user = None
     st.session_state.is_authenticated = False
     st.session_state.access_token = None
@@ -145,7 +138,7 @@ def render_login_page():
         }
         </style>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     st.markdown(
@@ -155,7 +148,7 @@ def render_login_page():
             <div class="login-subtitle">Know when to buy. Save money.</div>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     tab1, tab2 = st.tabs(["🔑 Login", "📝 Sign Up"])
@@ -182,9 +175,9 @@ def render_login_page():
             st.markdown(
                 f'<a href="{google_url}" target="_blank" '
                 f'style="display:block;text-align:center;padding:0.5rem;'
-                f'border:1px solid #FF6B6B;border-radius:8px;text-decoration:none;'
+                f"border:1px solid #FF6B6B;border-radius:8px;text-decoration:none;"
                 f'color:#FF6B6B;">Login with Google</a>',
-                unsafe_allow_html=True
+                unsafe_allow_html=True,
             )
 
     with tab2:

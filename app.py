@@ -1,43 +1,36 @@
-import streamlit as st
+import contextlib
+from datetime import datetime
+
 import pandas as pd
-from datetime import datetime, timedelta
-from typing import Optional, Dict, List
+import streamlit as st
 
 # Internal modules
-from auth import init_session_state, require_auth, sign_out, get_current_user
-from database import (
-    create_product,
-    get_product_by_url,
-    track_product,
-    get_user_tracks,
-    add_price_history,
-    get_price_history,
-    get_latest_price,
-    get_prediction,
-    remove_user_track,
-    get_user_stats,
-    update_user_track
-)
-from scraper import scrape_product, detect_source
-from predictor import analyze_product, get_savings_estimate
+from auth import get_current_user, init_session_state, require_auth, sign_out
 from charts import (
     create_price_chart,
-    create_savings_gauge,
-    create_recommendation_card,
     create_product_card,
-    create_savings_summary_chart
+    create_recommendation_card,
 )
-from scheduler import start_scheduler, get_scheduler_status
-import config
+from database import (
+    add_price_history,
+    create_product,
+    get_latest_price,
+    get_prediction,
+    get_price_history,
+    get_product_by_url,
+    get_user_stats,
+    get_user_tracks,
+    remove_user_track,
+    track_product,
+    update_user_track,
+)
+from predictor import analyze_product, get_savings_estimate
+from scheduler import get_scheduler_status, start_scheduler
+from scraper import detect_source, scrape_product
 
 # ==================== PAGE CONFIG ====================
 
-st.set_page_config(
-    page_title="AI Price Predictor",
-    page_icon="🔮",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="AI Price Predictor", page_icon="🔮", layout="wide", initial_sidebar_state="expanded")
 
 # ==================== CUSTOM CSS ====================
 
@@ -148,6 +141,7 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # ==================== UTILITY FUNCTIONS ====================
 
+
 def format_price(price: float) -> str:
     """Format price with Indian rupee symbol"""
     return f"₹{price:,.0f}"
@@ -181,18 +175,15 @@ def safe_date(value) -> datetime:
 
 # ==================== PAGE RENDERERS ====================
 
+
 def render_header():
     """Render header with app title and user info"""
     col1, col2 = st.columns([4, 1])
     with col1:
+        st.markdown('<h1 style="font-size: 2.2rem;">🔮 AI Price Predictor</h1>', unsafe_allow_html=True)
         st.markdown(
-            '<h1 style="font-size: 2.2rem;">🔮 AI Price Predictor</h1>',
-            unsafe_allow_html=True
-        )
-        st.markdown(
-            '<p style="color: #888888; margin-top: -15px;">'
-            'The smartest way to know <b>when to buy</b>.</p>',
-            unsafe_allow_html=True
+            '<p style="color: #888888; margin-top: -15px;">The smartest way to know <b>when to buy</b>.</p>',
+            unsafe_allow_html=True,
         )
     with col2:
         user = get_current_user()
@@ -200,8 +191,8 @@ def render_header():
             email = user.get("email", "")
             st.markdown(
                 f'<p style="text-align: right; color: #888888;">'
-                f'👤 {email}<br><small>Last check: {datetime.now().strftime("%H:%M")}</small></p>',
-                unsafe_allow_html=True
+                f"👤 {email}<br><small>Last check: {datetime.now().strftime('%H:%M')}</small></p>",
+                unsafe_allow_html=True,
             )
 
 
@@ -241,7 +232,7 @@ def render_dashboard():
                 </div>
             </div>
             """,
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
     else:
         # Process each tracked product
@@ -264,15 +255,18 @@ def render_dashboard():
                     "predicted_low_date": prediction.get("predicted_date"),
                     "confidence": prediction.get("confidence", 0),
                     "recommendation": prediction.get("recommendation", "NO_DATA"),
-                    "reasoning": prediction.get("reasoning", "")
+                    "reasoning": prediction.get("reasoning", ""),
                 }
 
             # Render product card
-            card_html = create_product_card({
-                "name": product.get("name", "Product"),
-                "url": product.get("url", ""),
-                "image_url": product.get("image_url", "")
-            }, analysis)
+            card_html = create_product_card(
+                {
+                    "name": product.get("name", "Product"),
+                    "url": product.get("url", ""),
+                    "image_url": product.get("image_url", ""),
+                },
+                analysis,
+            )
 
             st.markdown(card_html, unsafe_allow_html=True)
 
@@ -297,8 +291,8 @@ def render_dashboard():
                 if latest:
                     st.markdown(
                         f'<p style="text-align:right; color:#888888; font-size:12px;">'
-                        f'Updated: {safe_date(latest["scraped_at"]).strftime("%b %d, %Y %H:%M")}</p>',
-                        unsafe_allow_html=True
+                        f"Updated: {safe_date(latest['scraped_at']).strftime('%b %d, %Y %H:%M')}</p>",
+                        unsafe_allow_html=True,
                     )
 
 
@@ -311,19 +305,19 @@ def render_add_product():
 
     st.markdown(
         '<p style="color:#888888;">Paste an <b>Amazon.in</b> or <b>Flipkart</b> product URL below.</p>',
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     with st.form("add_product_form"):
         url = st.text_input(
-            "🔗 Product URL",
-            placeholder="https://www.amazon.in/dp/B0CHX3QCBS or https://www.flipkart.com/..."
+            "🔗 Product URL", placeholder="https://www.amazon.in/dp/B0CHX3QCBS or https://www.flipkart.com/..."
         )
         target_price = st.number_input(
             "🎯 Target Price (optional)",
-            min_value=1.0, max_value=10000000.0,
+            min_value=1.0,
+            max_value=10000000.0,
             step=1000.0,
-            placeholder="Enter your target price"
+            placeholder="Enter your target price",
         )
         alert_email_default = True
         col1, col2 = st.columns(2)
@@ -349,8 +343,7 @@ def render_add_product():
 
         if not result["success"]:
             st.warning(
-                f"⚠️ {result.get('error', 'Could not scrape the product.')}\n\n"
-                f"Available sources: Amazon.in, Flipkart"
+                f"⚠️ {result.get('error', 'Could not scrape the product.')}\n\nAvailable sources: Amazon.in, Flipkart"
             )
             st.info("💡 Tip: Try copying the URL directly from the product page.")
             return
@@ -363,10 +356,7 @@ def render_add_product():
         else:
             # Create new product
             product = create_product(
-                url=url,
-                name=result["name"],
-                image_url=result.get("image_url"),
-                category=result.get("source")
+                url=url, name=result["name"], image_url=result.get("image_url"), category=result.get("source")
             )
             if not product:
                 st.error("Failed to save product. Please try again.")
@@ -374,11 +364,7 @@ def render_add_product():
             product_id = product["id"]
 
             # Add initial price
-            add_price_history(
-                product_id=product_id,
-                price=result["price"],
-                source=result.get("source")
-            )
+            add_price_history(product_id=product_id, price=result["price"], source=result.get("source"))
             st.success(f"✅ Product added! First price recorded: **{format_price(result['price'])}**")
 
         # Track product for user
@@ -390,7 +376,7 @@ def render_add_product():
             alert_enabled=True,
             alert_email=email_alert,
             alert_telegram=telegram_alert,
-            telegram_chat_id=st.session_state.get("telegram_chat_id")
+            telegram_chat_id=st.session_state.get("telegram_chat_id"),
         )
 
         st.success("🎉 Product added to your tracking list!")
@@ -404,20 +390,12 @@ def render_add_product():
         if analysis.get("status") == "ANALYZED":
             st.markdown("### 🧠 AI Analysis")
             st.markdown(
-                create_recommendation_card(
-                    analysis["recommendation"],
-                    analysis["confidence"]
-                ),
-                unsafe_allow_html=True
+                create_recommendation_card(analysis["recommendation"], analysis["confidence"]), unsafe_allow_html=True
             )
             st.markdown(f"💡 {analysis.get('reasoning', '')}")
 
             # Show price chart
-            fig = create_price_chart(
-                history,
-                predictions=analysis.get("trend", []),
-                product_name=result["name"]
-            )
+            fig = create_price_chart(history, predictions=analysis.get("trend", []), product_name=result["name"])
             st.plotly_chart(fig, use_container_width=True)
 
             # Show prediction info
@@ -427,20 +405,21 @@ def render_add_product():
                     f'<div style="background:#1E2130; border-radius:12px; padding:16px; border:1px solid #2A2D3E;">'
                     f'<b style="color:#FFFFFF;">🎯 Predicted Low</b><br><br>'
                     f'<span style="font-size:24px; font-weight:700; color:#2ECC71;">{format_price(analysis["predicted_low"])}</span>'
-                    f'</div>',
-                    unsafe_allow_html=True
+                    f"</div>",
+                    unsafe_allow_html=True,
                 )
             with col2:
                 st.markdown(
                     f'<div style="background:#1E2130; border-radius:12px; padding:16px; border:1px solid #2A2D3E;">'
                     f'<b style="color:#FFFFFF;">📅 Predicted Date</b><br><br>'
                     f'<span style="font-size:18px; color:#FFFFFF;">{safe_date(analysis.get("predicted_low_date")).strftime("%B %d, %Y")}</span>'
-                    f'</div>',
-                    unsafe_allow_html=True
+                    f"</div>",
+                    unsafe_allow_html=True,
                 )
 
             # Save prediction to DB
             from database import save_prediction
+
             save_prediction(
                 product_id=product_id,
                 predicted_low=analysis["predicted_low"],
@@ -448,7 +427,7 @@ def render_add_product():
                 confidence=analysis["confidence"],
                 recommendation=analysis["recommendation"],
                 predicted_date=analysis.get("predicted_low_date"),
-                reasoning=analysis.get("reasoning", "")
+                reasoning=analysis.get("reasoning", ""),
             )
 
 
@@ -466,6 +445,7 @@ def render_product_details():
         return
 
     from database import get_product_by_id
+
     product = get_product_by_id(product_id)
     if not product:
         st.error("Product not found.")
@@ -483,15 +463,13 @@ def render_product_details():
     col1, col2 = st.columns([3, 1])
     with col1:
         if product.get("image_url"):
-            try:
+            with contextlib.suppress(Exception):
                 st.image(product["image_url"], width=120)
-            except Exception:
-                pass
         source_label = "Amazon" if detect_source(product["url"]) == "amazon" else "Flipkart"
         st.markdown(
             f'<a href="{product["url"]}" target="_blank" '
             f'style="color:#3498DB; text-decoration:none;">🔗 View on {source_label} →</a>',
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
     with col2:
         # Latest price summary
@@ -501,7 +479,6 @@ def render_product_details():
 
     # Fetch data
     history = get_price_history(product_id, days=365)
-    prediction = get_prediction(product_id)
 
     if not history:
         st.info("No price data yet. Check back after the first scheduled update.")
@@ -514,8 +491,7 @@ def render_product_details():
     if analysis.get("status") == "ANALYZED":
         # Recommendation card
         st.markdown(
-            create_recommendation_card(analysis["recommendation"], analysis["confidence"]),
-            unsafe_allow_html=True
+            create_recommendation_card(analysis["recommendation"], analysis["confidence"]), unsafe_allow_html=True
         )
         st.markdown(f"💡 **Reasoning:** {analysis.get('reasoning', '')}")
 
@@ -529,15 +505,18 @@ def render_product_details():
         with col1:
             st.metric("🎯 Current", format_price(analysis["current_price"]))
         with col2:
-            st.metric("📉 Predicted Low", format_price(analysis["predicted_low"]),
-                      delta=f"-{format_price(analysis['current_price'] - analysis['predicted_low'])}")
+            st.metric(
+                "📉 Predicted Low",
+                format_price(analysis["predicted_low"]),
+                delta=f"-{format_price(analysis['current_price'] - analysis['predicted_low'])}",
+            )
         with col3:
             savings = get_savings_estimate(analysis)
-            st.metric("💸 Potential Savings", format_price(savings["savings"]),
-                      delta=f"{savings['savings_percent']:.1f}%")
+            st.metric(
+                "💸 Potential Savings", format_price(savings["savings"]), delta=f"{savings['savings_percent']:.1f}%"
+            )
         with col4:
-            st.metric("🎯 Best Buy Date",
-                      safe_date(analysis.get("predicted_low_date")).strftime("%b %d"))
+            st.metric("🎯 Best Buy Date", safe_date(analysis.get("predicted_low_date")).strftime("%b %d"))
 
     else:
         st.info(analysis.get("message", "Not enough data yet."))
@@ -565,8 +544,8 @@ def render_alerts_settings():
     st.markdown("### 📱 Get Telegram Alerts")
     st.markdown(
         '<p style="color:#888888;">Get instant alerts on your phone when prices drop. '
-        'Setup once and never miss a deal!</p>',
-        unsafe_allow_html=True
+        "Setup once and never miss a deal!</p>",
+        unsafe_allow_html=True,
     )
 
     col1, col2 = st.columns([2, 1])
@@ -574,7 +553,7 @@ def render_alerts_settings():
         telegram_id = st.text_input(
             "Telegram Chat ID",
             placeholder="e.g. 123456789 (get it from @userinfobot on Telegram)",
-            value=st.session_state.get("telegram_chat_id", "")
+            value=st.session_state.get("telegram_chat_id", ""),
         )
     with col2:
         st.markdown("")
@@ -600,7 +579,7 @@ def render_alerts_settings():
         </ol>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     # Frequency info
@@ -619,7 +598,7 @@ def render_sidebar():
     with st.sidebar:
         st.markdown(
             '<h1 style="padding-bottom:1rem; border-bottom:1px solid #2A2D3E;">🔮 <span style="font-size:0.8em;">AI Price Predictor</span></h1>',
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
 
         # Navigation options
@@ -636,12 +615,7 @@ def render_sidebar():
         if current_page in options:
             default_idx = options.index(current_page)
 
-        selected = st.radio(
-            "Navigation",
-            options,
-            label_visibility="collapsed",
-            index=default_idx
-        )
+        selected = st.radio("Navigation", options, label_visibility="collapsed", index=default_idx)
         st.session_state["current_page"] = selected
 
         st.markdown("---")
@@ -658,14 +632,14 @@ def render_sidebar():
                     f'<div style="background:#1E2130; border-radius:8px; padding:8px; text-align:center;">'
                     f'<span style="font-size:20px; font-weight:700; color:#FFFFFF;">{stats["total_tracked"]}</span><br>'
                     f'<span style="font-size:11px; color:#888;">TRACKED</span></div>',
-                    unsafe_allow_html=True
+                    unsafe_allow_html=True,
                 )
             with col2:
                 st.markdown(
                     f'<div style="background:#1E2130; border-radius:8px; padding:8px; text-align:center;">'
                     f'<span style="font-size:20px; font-weight:700; color:#2ECC71;">{stats["buy_now_count"]}</span><br>'
                     f'<span style="font-size:11px; color:#888;">BUY NOW</span></div>',
-                    unsafe_allow_html=True
+                    unsafe_allow_html=True,
                 )
 
             st.markdown("")
@@ -711,18 +685,18 @@ def render_about():
         </p>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     st.markdown("---")
     st.markdown(
-        '<p style="text-align:center; color:#666666; font-size:12px;">'
-        'Made with ❤️ using Streamlit • Free forever</p>',
-        unsafe_allow_html=True
+        '<p style="text-align:center; color:#666666; font-size:12px;">Made with ❤️ using Streamlit • Free forever</p>',
+        unsafe_allow_html=True,
     )
 
 
 # ==================== MAIN APP ====================
+
 
 def main():
     """Main application entry point"""
