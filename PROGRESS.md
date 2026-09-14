@@ -111,7 +111,9 @@
 - [x] Bump deps to patched versions (pip-audit: 51 vulns → 0):
   - streamlit 1.31→1.54, dotenv 1.0.0→1.2.2, requests 2.31→2.33, sklearn 1.4.2→1.5.0
 - [x] Verify app boots with Streamlit 1.54 (health "ok")
-- [ ] PUSH to GitHub ← NEXT
+- [x] CI RUNS GREEN ON GITHUB (all 5 jobs: lint / 3.11 / 3.12 / smoke / security) ✅
+- [x] Bump GitHub Actions to Node 24: checkout@v6, setup-python@v6, gitleaks@v3 (no deprecation warnings)
+- [x] Deploy workflow verified to SKIP gracefully when APP_URL unset
 
 ### Phase 14: LIVE DEPLOYMENT ⏳ PENDING (USER ACCOUNTS NEEDED)
 - [ ] Create Supabase project + run supabase_schema.sql (user)
