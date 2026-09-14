@@ -41,10 +41,9 @@ def get_current_user() -> dict | None:
 def sign_up_with_email(email: str, password: str, name: str = None) -> dict:
     """Sign up a new user with email/password"""
     try:
-        user_data = {"email": email, "password": password}
+        user_data = {"email": email, "password": password, "options": {}}
         if name:
-            data = {"data": {"full_name": name}}
-            user_data.update(data)
+            user_data["options"]["data"] = {"full_name": name}
         result = get_auth_client().auth.sign_up(user_data)
         return {"success": True, "user": result.user, "session": result.session}
     except Exception as e:
@@ -80,7 +79,7 @@ def handle_oauth_callback():
     query_params = st.query_params
     if "code" in query_params:
         try:
-            result = get_auth_client().auth.exchange_code_for_session(query_params.get("code"))
+            result = get_auth_client().auth.exchange_code_for_session({"auth_code": query_params.get("code")})
             if result.session:
                 st.session_state.access_token = result.session.access_token
                 st.session_state.refresh_token = result.session.refresh_token
