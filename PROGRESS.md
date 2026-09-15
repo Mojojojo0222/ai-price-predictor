@@ -1,7 +1,7 @@
 # AI Price Predictor - Progress Tracker
 
-## Current Status: BUILDING (resumed - CI/CD added)
-## Last Updated: Sep 14, 2026 (3rd session - DevOps)
+## Current Status: LIVE (deployed on Streamlit Cloud)
+## Last Updated: Sep 16, 2026 (4th session - auth hotfix)
 
 ---
 
@@ -115,11 +115,13 @@
 - [x] Bump GitHub Actions to Node 24: checkout@v6, setup-python@v6, gitleaks@v3 (no deprecation warnings)
 - [x] Deploy workflow verified to SKIP gracefully when APP_URL unset
 
-### Phase 14: LIVE DEPLOYMENT ⏳ PENDING (USER ACCOUNTS NEEDED)
-- [ ] Create Supabase project + run supabase_schema.sql (user)
-- [ ] Deploy on Streamlit Community Cloud (user)
-- [ ] Set repo Variables/Secrets: APP_URL, SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY
-- [ ] Test end-to-end on live URL
+### Phase 14: LIVE DEPLOYMENT ✅ COMPLETE
+- [x] Create Supabase project + run supabase_schema.sql (user)
+- [x] Deploy on Streamlit Community Cloud (user) → https://ai-pricepredictor.streamlit.app
+- [x] Set repo Variables/Secrets: APP_URL, SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY
+- [x] Test end-to-end on live URL
+- [x] Fix live crash after email sign-in: supabase-auth 2.x returns pydantic `User` objects, not dicts → `user.get('email')` raised `AttributeError`. Added `_user_to_dict()` normalization in auth.py + regression tests (tests/test_auth.py)
+- [x] Fix Google login button to use real OAuth flow + APP_URL redirect (was hardcoded to accounts.google.com)
 
 ---
 
@@ -153,6 +155,7 @@
 - ~ Fixed f-string nested-quote bug in app.py render_product_details
 - ~ Fixed duplicate `color` kwarg in charts.py annotation
 - ~ Made Supabase client lazy so app launches before real credentials
+- ~ Fixed live crash after email sign-in (supabase-auth 2.x returns pydantic `User`, not dict)
 
 ## NEXT ACTION (When Work Resumes)
 Deployment requires USER accounts:

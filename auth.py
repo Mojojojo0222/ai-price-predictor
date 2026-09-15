@@ -3,7 +3,7 @@ import contextlib
 import streamlit as st
 from supabase import Client, create_client
 
-from config import SUPABASE_KEY, SUPABASE_URL
+from config import APP_URL, SUPABASE_KEY, SUPABASE_URL
 
 # Lazy Supabase client initialization (so app works before real credentials)
 _auth_client: Client | None = None
@@ -31,6 +31,24 @@ def init_session_state():
         st.session_state.refresh_token = None
 
 
+def _user_to_dict(user) -> dict | None:
+    """Convert a supabase User (pydantic model) to a plain dict for session storage"""
+    if user is None:
+        return None
+    if isinstance(user, dict):
+        return user
+    for method in ("model_dump", "dict"):
+        converter = getattr(user, method, None)
+        if callable(converter):
+            with contextlib.suppress(Exception):
+                return converter()
+    return {
+        "id": getattr(user, "id", None),
+        "email": getattr(user, "email", None),
+        "user_metadata": getattr(user, "user_metadata", {}) or {},
+    }
+
+
 def get_current_user() -> dict | None:
     """Get the current logged-in user"""
     if st.session_state.get("is_authenticated"):
@@ -45,7 +63,7 @@ def sign_up_with_email(email: str, password: str, name: str = None) -> dict:
         if name:
             user_data["options"]["data"] = {"full_name": name}
         result = get_auth_client().auth.sign_up(user_data)
-        return {"success": True, "user": result.user, "session": result.session}
+        return {"success": True, "user": _user_to_dict(result.user), "session": result.session}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -57,7 +75,7 @@ def sign_in_with_email(email: str, password: str) -> dict:
         if result.session:
             st.session_state.access_token = result.session.access_token
             st.session_state.refresh_token = result.session.refresh_token
-        return {"success": True, "user": result.user, "session": result.session}
+        return {"success": True, "user": _user_to_dict(result.user), "session": result.session}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -67,7 +85,7 @@ def sign_in_with_google():
     try:
         # This returns a URL the user must visit to authenticate
         result = get_auth_client().auth.sign_in_with_oauth(
-            {"provider": "google", "options": {"redirect_to": "https://your-app.streamlit.app"}}
+            {"provider": "google", "options": {"redirect_to": APP_URL}}
         )
         return {"success": True, "url": result.url}
     except Exception as e:
@@ -83,7 +101,7 @@ def handle_oauth_callback():
             if result.session:
                 st.session_state.access_token = result.session.access_token
                 st.session_state.refresh_token = result.session.refresh_token
-                st.session_state.user = result.user
+                st.session_state.user = _user_to_dict(result.user)
                 st.session_state.is_authenticated = True
                 st.query_params.clear()
                 return True
@@ -170,14 +188,18 @@ def render_login_page():
                 else:
                     st.warning("Please enter email and password")
         with col2:
-            google_url = "https://accounts.google.com"
-            st.markdown(
-                f'<a href="{google_url}" target="_blank" '
-                f'style="display:block;text-align:center;padding:0.5rem;'
-                f"border:1px solid #FF6B6B;border-radius:8px;text-decoration:none;"
-                f'color:#FF6B6B;">Login with Google</a>',
-                unsafe_allow_html=True,
-            )
+            google_result = sign_in_with_google()
+            google_url = google_result.get("url") if google_result.get("success") else None
+            if google_url:
+                st.link_button("Login with Google", google_url, use_container_width=True)
+            else:
+                st.markdown(
+                    '<a href="https://accounts.google.com" target="_blank" '
+                    'style="display:block;text-align:center;padding:0.5rem;'
+                    "border:1px solid #FF6B6B;border-radius:8px;text-decoration:none;"
+                    'color:#FF6B6B;">Login with Google</a>',
+                    unsafe_allow_html=True,
+                )
 
     with tab2:
         st.text_input("👤 Full Name", key="signup_name")
