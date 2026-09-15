@@ -122,6 +122,7 @@
 - [x] Test end-to-end on live URL
 - [x] Fix live crash after email sign-in: supabase-auth 2.x returns pydantic `User` objects, not dicts → `user.get('email')` raised `AttributeError`. Added `_user_to_dict()` normalization in auth.py + regression tests (tests/test_auth.py)
 - [x] Fix Google login button to use real OAuth flow + APP_URL redirect (was hardcoded to accounts.google.com)
+- [x] Fix live crash from postgrest 2.31.0 API change: `order()` now uses `desc=` kwarg instead of `ascending=` (5 call sites in database.py)
 
 ---
 
@@ -156,6 +157,7 @@
 - ~ Fixed duplicate `color` kwarg in charts.py annotation
 - ~ Made Supabase client lazy so app launches before real credentials
 - ~ Fixed live crash after email sign-in (supabase-auth 2.x returns pydantic `User`, not dict)
+- ~ Fixed live crash in DB queries (postgrest 2.31.0 renamed `order(ascending=)` → `order(desc=)`)
 
 ## NEXT ACTION (When Work Resumes)
 Deployment requires USER accounts:
