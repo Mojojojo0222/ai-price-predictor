@@ -222,10 +222,15 @@ def render_login_page():
             else:
                 result = sign_up_with_email(email, password, name)
                 if result["success"]:
-                    st.success("Account created! Check your email to confirm.")
-                    st.session_state.user = result["user"]
-                    st.session_state.is_authenticated = True
-                    st.rerun()
+                    if result.get("session"):
+                        st.session_state.user = result["user"]
+                        st.session_state.is_authenticated = True
+                        st.rerun()
+                    else:
+                        st.success(
+                            "Account created! 📧 A confirmation email was sent. "
+                            "Click the link in it to activate your account, then log in."
+                        )
                 else:
                     st.error(f"Sign up failed: {result['error']}")
 
