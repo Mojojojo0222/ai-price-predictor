@@ -160,12 +160,13 @@
 - ~ Fixed live crash in DB queries (postgrest 2.31.0 renamed `order(ascending=)` → `order(desc=)`)
 
 ## NEXT ACTION (When Work Resumes)
-Deployment requires USER accounts:
-1. GitHub repo (user's account) → push this folder
-2. Supabase free project (user's account) → run supabase_schema.sql
-3. Streamlit Cloud (user's account) → deploy from GitHub, set env vars
-4. Update APP_URL in .env / Streamlit secrets
-5. Test end-to-end
+One config step left on Supabase dashboard to finish email-confirmation flow:
+1. **Supabase → Authentication → URL Configuration:**
+   - Site URL: `https://ai-pricepredictor.streamlit.app`
+   - Redirect URLs: add `https://ai-pricepredictor.streamlit.app/**` (+ `http://localhost:8501/**` for local dev)
+   - Save, then resend confirmation for existing users (or sign up fresh) and test login end-to-end.
+2. Test live: sign up → confirm email → land on app → sign in → dashboard
+3. (Optional) Test Google OAuth + set ScraperAPI/Telegram keys
 
 ## SETUP REQUIRED BY USER (for full functionality)
 1. **Supabase free account** at supabase.com → create project
